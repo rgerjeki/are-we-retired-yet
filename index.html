@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Retirement Countdown // GAME OVER (eventually)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0f0f23;
+      --panel: #1a1a2e;
+      --border: #16213e;
+      --green: #00ff41;
+      --cyan: #00d4ff;
+      --magenta: #ff00ff;
+      --yellow: #ffd700;
+      --red: #ff4444;
+      --orange: #ff8c00;
+      --white: #e0e0e0;
+      --dim: #555580;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--green);
+      font-family: 'Press Start 2P', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+      image-rendering: pixelated;
+    }
+
+    /* Scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 2px,
+        rgba(0, 0, 0, 0.08) 4px
+      );
+      z-index: 9999;
+    }
+
+    /* Pixel border helper */
+    .pixel-border {
+      border: 4px solid var(--green);
+      box-shadow:
+        inset -4px -4px 0 0 #003300,
+        inset 4px 4px 0 0 #00ff4180,
+        0 0 20px rgba(0, 255, 65, 0.15);
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      padding: 30px 20px 10px;
+    }
+
+    .header h1 {
+      font-size: clamp(12px, 3vw, 24px);
+      color: var(--yellow);
+      text-shadow: 3px 3px 0 #8B6914, 0 0 20px rgba(255, 215, 0, 0.4);
+      margin-bottom: 8px;
+      animation: flicker 4s infinite;
+    }
+
+    .header .subtitle {
+      font-size: clamp(7px, 1.5vw, 10px);
+      color: var(--dim);
+      letter-spacing: 2px;
+    }
+
+    @keyframes flicker {
+      0%, 95%, 100% { opacity: 1; }
+      96% { opacity: 0.8; }
+      97% { opacity: 1; }
+      98% { opacity: 0.6; }
+      99% { opacity: 1; }
+    }
+
+    /* Player select */
+    .player-select {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      padding: 16px 20px;
+      flex-wrap: wrap;
+    }
+
+    .player-btn {
+      font-family: 'Press Start 2P', monospace;
+      font-size: clamp(8px, 1.5vw, 11px);
+      padding: 10px 20px;
+      background: var(--panel);
+      color: var(--dim);
+      border: 3px solid var(--dim);
+      cursor: pointer;
+      transition: all 0.1s;
+      text-transform: uppercase;
+    }
+
+    .player-btn:hover {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+    }
+
+    .player-btn.active {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      background: #0a2a3a;
+      box-shadow:
+        0 0 15px rgba(0, 212, 255, 0.3),
+        inset 0 0 15px rgba(0, 212, 255, 0.1);
+    }
+
+    .player-btn.active::before {
+      content: '> ';
+    }
+
+    .player-btn.active::after {
+      content: ' <';
+    }
+
+    /* XP Bar */
+    .xp-section {
+      padding: 10px 30px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .xp-label {
+      font-size: clamp(6px, 1.2vw, 8px);
+      color: var(--dim);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .xp-bar-outer {
+      height: 20px;
+      background: #111;
+      border: 2px solid var(--dim);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .xp-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, var(--red), var(--orange), var(--yellow), var(--green));
+      transition: width 1s ease;
+      position: relative;
+    }
+
+    .xp-bar-inner::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50%;
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Main countdown */
+    .countdown-main {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .big-number {
+      font-size: clamp(36px, 10vw, 80px);
+      color: var(--green);
+      text-shadow:
+        0 0 20px rgba(0, 255, 65, 0.6),
+        0 0 40px rgba(0, 255, 65, 0.3),
+        4px 4px 0 #003300;
+      line-height: 1;
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    .big-label {
+      font-size: clamp(8px, 1.8vw, 14px);
+      color: var(--cyan);
+      margin-top: 8px;
+      letter-spacing: 4px;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { text-shadow: 0 0 20px rgba(0, 255, 65, 0.6), 0 0 40px rgba(0, 255, 65, 0.3), 4px 4px 0 #003300; }
+      50% { text-shadow: 0 0 30px rgba(0, 255, 65, 0.8), 0 0 60px rgba(0, 255, 65, 0.4), 4px 4px 0 #003300; }
+    }
+
+    /* Time grid */
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      padding: 10px 20px;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .time-box {
+      background: var(--panel);
+      padding: 16px 8px;
+      text-align: center;
+      border: 2px solid var(--border);
+      position: relative;
+    }
+
+    .time-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--cyan);
+      opacity: 0.5;
+    }
+
+    .time-val {
+      font-size: clamp(16px, 4vw, 32px);
+      color: var(--yellow);
+      text-shadow: 2px 2px 0 #8B6914;
+      display: block;
+    }
+
+    .time-label {
+      font-size: clamp(5px, 1vw, 7px);
+      color: var(--dim);
+      margin-top: 8px;
+      display: block;
+      letter-spacing: 1px;
+    }
+
+    /* Stats panel */
+    .stats-panel {
+      max-width: 900px;
+      margin: 16px auto;
+      padding: 0 20px;
+    }
+
+    .stats-title {
+      font-size: clamp(8px, 1.5vw, 11px);
+      color: var(--magenta);
+      text-align: center;
+      margin-bottom: 12px;
+      text-shadow: 0 0 10px rgba(255, 0, 255, 0.4);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 8px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: var(--panel);
+      border-left: 3px solid var(--green);
+      font-size: clamp(6px, 1.1vw, 8px);
+    }
+
+    .stat-row .stat-icon {
+      margin-right: 8px;
+    }
+
+    .stat-row .stat-name {
+      color: var(--dim);
+      flex: 1;
+    }
+
+    .stat-row .stat-value {
+      color: var(--green);
+      text-align: right;
+    }
+
+    .stat-row:nth-child(even) {
+      border-left-color: var(--cyan);
+    }
+
+    .stat-row:nth-child(even) .stat-value {
+      color: var(--cyan);
+    }
+
+    .stat-row:nth-child(3n) {
+      border-left-color: var(--yellow);
+    }
+
+    .stat-row:nth-child(3n) .stat-value {
+      color: var(--yellow);
+    }
+
+    /* Achievement toast */
+    .achievement {
+      text-align: center;
+      padding: 20px;
+      margin: 10px auto;
+      max-width: 500px;
+    }
+
+    .achievement-box {
+      background: var(--panel);
+      border: 3px solid var(--yellow);
+      padding: 16px 24px;
+      display: inline-block;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+      animation: achievement-pop 0.5s ease;
+    }
+
+    .achievement-label {
+      font-size: 7px;
+      color: var(--yellow);
+      letter-spacing: 3px;
+      margin-bottom: 8px;
+    }
+
+    .achievement-text {
+      font-size: clamp(7px, 1.2vw, 9px);
+      color: var(--white);
+      line-height: 1.8;
+    }
+
+    @keyframes achievement-pop {
+      0% { transform: scale(0.8); opacity: 0; }
+      50% { transform: scale(1.05); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Footer / quote */
+    .footer {
+      text-align: center;
+      padding: 20px;
+      margin-top: 10px;
+    }
+
+    .quote {
+      font-size: clamp(6px, 1vw, 8px);
+      color: var(--dim);
+      font-style: italic;
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 2;
+    }
+
+    .blink {
+      animation: blink-anim 1s step-end infinite;
+    }
+
+    @keyframes blink-anim {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* Pixel art characters */
+    .pixel-characters {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      padding: 10px 20px;
+    }
+
+    .pixel-char {
+      text-align: center;
+    }
+
+    .pixel-char .sprite {
+      font-size: 40px;
+      line-height: 1;
+      filter: drop-shadow(0 0 8px rgba(0, 255, 65, 0.3));
+    }
+
+    .pixel-char .char-name {
+      font-size: 8px;
+      color: var(--cyan);
+      margin-top: 6px;
+    }
+
+    .pixel-char .char-age {
+      font-size: 7px;
+      color: var(--dim);
+      margin-top: 2px;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .time-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Star background */
+    .stars {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+
+    .star {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: var(--white);
+      animation: twinkle 3s infinite;
+    }
+
+    @keyframes twinkle {
+      0%, 100% { opacity: 0.2; }
+      50% { opacity: 0.8; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="header">
+  <h1>RETIREMENT COUNTDOWN</h1>
+  <div class="subtitle">-- PRESS START TO FEEL OLD --</div>
+</div>
+
+<div class="player-select">
+  <button class="player-btn active" onclick="selectPlayer(0)">REG</button>
+  <button class="player-btn" onclick="selectPlayer(1)">BCD</button>
+  <button class="player-btn" onclick="selectPlayer(2)">Both</button>
+</div>
+
+<div class="pixel-characters">
+  <div class="pixel-char">
+    <div class="sprite" id="sprite1">&#x1F9D1;&#x200D;&#x1F4BB;</div>
+    <div class="char-name" id="charName1">PLAYER 1</div>
+    <div class="char-age" id="charAge1">LVL 24</div>
+  </div>
+  <div class="pixel-char">
+    <div class="sprite" id="sprite2">&#x1F9D1;&#x200D;&#x1F4BB;</div>
+    <div class="char-name" id="charName2">PLAYER 2</div>
+    <div class="char-age" id="charAge2">LVL 23</div>
+  </div>
+</div>
+
+<div class="xp-section">
+  <div class="xp-label">
+    <span>CAREER PROGRESS</span>
+    <span id="xp-pct">0%</span>
+  </div>
+  <div class="xp-bar-outer pixel-border">
+    <div class="xp-bar-inner" id="xp-bar" style="width: 0%"></div>
+  </div>
+</div>
+
+<div class="countdown-main">
+  <div class="big-number" id="bigDays">----</div>
+  <div class="big-label">DAYS REMAINING</div>
+</div>
+
+<div class="time-grid">
+  <div class="time-box">
+    <span class="time-val" id="years">--</span>
+    <span class="time-label">YEARS</span>
+  </div>
+  <div class="time-box">
+    <span class="time-val" id="months">--</span>
+    <span class="time-label">MONTHS</span>
+  </div>
+  <div class="time-box">
+    <span class="time-val" id="hours">--</span>
+    <span class="time-label">HOURS</span>
+  </div>
+  <div class="time-box">
+    <span class="time-val" id="minutes">--</span>
+    <span class="time-label">MINUTES</span>
+  </div>
+</div>
+
+<div class="stats-panel">
+  <div class="stats-title">~ SURVIVAL STATS ~</div>
+  <div class="stats-grid" id="statsGrid">
+    <!-- filled by JS -->
+  </div>
+</div>
+
+<div class="achievement">
+  <div class="achievement-box">
+    <div class="achievement-label">ACHIEVEMENT UNLOCKED</div>
+    <div class="achievement-text" id="achievementText">Loading...</div>
+  </div>
+</div>
+
+<div class="footer">
+  <div class="quote" id="quoteText">"Loading wisdom..."</div>
+  <br>
+  <span class="blink" style="color: var(--dim); font-size: 8px;">_</span>
+</div>
+
+<script>
+  // ── CONFIG ──
+  const players = [
+    { name: 'REG', age: 24, retireAge: 62 },
+    { name: 'BCD', age: 23, retireAge: 62 },
+  ];
+
+  let currentView = 0; // 0 = P1, 1 = P2, 2 = both (average)
+
+  // ── STARS ──
+  (function createStars() {
+    const container = document.getElementById('stars');
+    for (let i = 0; i < 80; i++) {
+      const star = document.createElement('div');
+      star.className = 'star';
+      star.style.left = Math.random() * 100 + '%';
+      star.style.top = Math.random() * 100 + '%';
+      star.style.animationDelay = Math.random() * 3 + 's';
+      star.style.opacity = Math.random() * 0.5 + 0.1;
+      container.appendChild(star);
+    }
+  })();
+
+  // ── PLAYER SELECT ──
+  function selectPlayer(idx) {
+    currentView = idx;
+    document.querySelectorAll('.player-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', i === idx);
+    });
+    update();
+  }
+
+  // ── CALC ──
+  function getRetireDate(player) {
+    const now = new Date();
+    const birthYear = now.getFullYear() - player.age;
+    return new Date(birthYear + player.retireAge, now.getMonth(), now.getDate());
+  }
+
+  function getTimeLeft(player) {
+    const now = new Date();
+    const retire = getRetireDate(player);
+    const diff = retire - now;
+    if (diff <= 0) return null;
+
+    const totalDays = diff / (1000 * 60 * 60 * 24);
+    const totalHours = diff / (1000 * 60 * 60);
+    const totalMinutes = diff / (1000 * 60);
+    const totalSeconds = diff / 1000;
+
+    const years = Math.floor(totalDays / 365.25);
+    const months = Math.floor(totalDays / 30.44);
+
+    // Count Fridays remaining
+    let fridays = 0;
+    let mondays = 0;
+    let weekends = 0;
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    const end = new Date(retire);
+    end.setHours(0, 0, 0, 0);
+    while (d <= end) {
+      const day = d.getDay();
+      if (day === 5) fridays++;
+      if (day === 1) mondays++;
+      if (day === 0 || day === 6) weekends++;
+      d.setDate(d.getDate() + 1);
+    }
+
+    // Work days (Mon-Fri)
+    const workDays = Math.floor(totalDays) - weekends;
+
+    return {
+      totalDays: Math.floor(totalDays),
+      years,
+      months,
+      totalHours: Math.floor(totalHours),
+      totalMinutes: Math.floor(totalMinutes),
+      totalSeconds: Math.floor(totalSeconds),
+      fridays,
+      mondays,
+      weekends,
+      workDays,
+      retireAge: player.retireAge,
+      currentAge: player.age,
+    };
+  }
+
+  function avgData(d1, d2) {
+    if (!d1 || !d2) return d1 || d2;
+    const avg = {};
+    for (const key of Object.keys(d1)) {
+      avg[key] = typeof d1[key] === 'number' ? Math.round((d1[key] + d2[key]) / 2) : d1[key];
+    }
+    return avg;
+  }
+
+  // ── STATS ──
+  function buildStats(data) {
+    if (!data) return [];
+    const workHours = data.workDays * 8;
+    return [
+      { icon: '&#x1F4C5;', name: 'WORK DAYS LEFT', value: data.workDays.toLocaleString() },
+      { icon: '&#x1F389;', name: 'FRIDAYS LEFT', value: data.fridays.toLocaleString() },
+      { icon: '&#x1F62D;', name: 'MONDAYS LEFT', value: data.mondays.toLocaleString() },
+      { icon: '&#x1F3D6;', name: 'WEEKEND DAYS LEFT', value: data.weekends.toLocaleString() },
+      { icon: '&#x2615;', name: 'COFFEES TO DRINK', value: (data.workDays * 2).toLocaleString() },
+      { icon: '&#x1F4BC;', name: 'WORK HOURS LEFT', value: workHours.toLocaleString() },
+      { icon: '&#x1F634;', name: 'ALARMS TO SUFFER', value: data.workDays.toLocaleString() },
+      { icon: '&#x1F355;', name: 'LUNCH BREAKS', value: data.workDays.toLocaleString() },
+      { icon: '&#x1F3AE;', name: 'AFTER-WORK GAME SESSIONS', value: data.workDays.toLocaleString() },
+      { icon: '&#x1F4B8;', name: 'PAYCHECKS LEFT', value: (data.months * 2).toLocaleString() },
+      { icon: '&#x1F4C8;', name: 'MEETINGS TO SURVIVE', value: (data.workDays * 2).toLocaleString() },
+      { icon: '&#x231B;', name: 'TOTAL SECONDS', value: data.totalSeconds.toLocaleString() },
+    ];
+  }
+
+  // ── ACHIEVEMENTS ──
+  const achievements = [
+    (d) => d.totalDays < 14000 ? 'HALFWAY THERE... MAYBE' : null,
+    (d) => d.fridays < 2000 ? 'LESS THAN 2K FRIDAYS - USE THEM WISELY' : null,
+    (d) => d.mondays > 1500 ? 'OVER 1500 MONDAYS LEFT... F' : null,
+    (d) => d.years < 40 ? `ONLY ${d.years} YEARS! (only...)` : null,
+    (d) => d.workDays > 9000 ? 'IT\'S OVER 9000!! (work days)' : null,
+    (d) => d.weekends > 3000 ? `${d.weekends} WEEKENDS - MAKE THEM COUNT` : null,
+    (d) => `LVL ${d.currentAge} -> LVL ${d.retireAge}: ${d.years} LEVELS TO GO`,
+  ];
+
+  function getAchievement(data) {
+    if (!data) return 'GAME OVER - YOU RETIRED!';
+    for (const fn of achievements) {
+      const result = fn(data);
+      if (result) return result;
+    }
+    return 'KEEP GRINDING...';
+  }
+
+  // ── QUOTES ──
+  const quotes = [
+    '"The trouble with retirement is you never get a day off." - Abe Lemons',
+    '"Retirement: where every day is Saturday... eventually."',
+    '"I\'m not lazy, I\'m on energy saving mode until retirement."',
+    '"Age is just a number. A very, very large number."',
+    '"Current quest: Survive until retirement."',
+    '"Loading retirement.exe ... estimated time: decades."',
+    '"CTRL+ALT+DEL this career? Y/N"',
+    '"Your princess is in another castle. And so is your retirement."',
+    '"Do a barrel roll through the work week."',
+    '"It\'s dangerous to go alone! Take this coffee."',
+    '"Press F to pay respects to your free time."',
+  ];
+
+  // ── UPDATE ──
+  function update() {
+    let data;
+    if (currentView === 2) {
+      data = avgData(getTimeLeft(players[0]), getTimeLeft(players[1]));
+    } else {
+      data = getTimeLeft(players[currentView]);
+    }
+
+    if (!data) {
+      document.getElementById('bigDays').textContent = 'GAME OVER';
+      return;
+    }
+
+    // Big number
+    document.getElementById('bigDays').textContent = data.totalDays.toLocaleString();
+
+    // Time boxes
+    document.getElementById('years').textContent = data.years;
+    document.getElementById('months').textContent = data.months;
+    document.getElementById('hours').textContent = data.totalHours.toLocaleString();
+    document.getElementById('minutes').textContent = data.totalMinutes.toLocaleString();
+
+    // XP bar
+    const totalCareerYears = data.retireAge - 22; // assume career start ~22
+    const yearsWorked = totalCareerYears - data.years;
+    const pct = Math.max(0, Math.min(100, (yearsWorked / totalCareerYears) * 100));
+    document.getElementById('xp-bar').style.width = pct.toFixed(1) + '%';
+    document.getElementById('xp-pct').textContent = pct.toFixed(1) + '% COMPLETE';
+
+    // Stats
+    const stats = buildStats(data);
+    const grid = document.getElementById('statsGrid');
+    grid.innerHTML = stats.map(s =>
+      `<div class="stat-row">
+        <span class="stat-icon">${s.icon}</span>
+        <span class="stat-name">${s.name}</span>
+        <span class="stat-value">${s.value}</span>
+      </div>`
+    ).join('');
+
+    // Achievement
+    document.getElementById('achievementText').textContent = getAchievement(data);
+
+    // Character info
+    document.getElementById('charName1').textContent = players[0].name;
+    document.getElementById('charAge1').textContent = `LVL ${players[0].age}`;
+    document.getElementById('charName2').textContent = players[1].name;
+    document.getElementById('charAge2').textContent = `LVL ${players[1].age}`;
+  }
+
+  // ── QUOTE ROTATION ──
+  function rotateQuote() {
+    const el = document.getElementById('quoteText');
+    el.textContent = quotes[Math.floor(Math.random() * quotes.length)];
+  }
+
+  // ── INIT ──
+  update();
+  rotateQuote();
+  setInterval(update, 1000);
+  setInterval(rotateQuote, 8000);
+</script>
+
+</body>
+</html>
