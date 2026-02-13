@@ -521,9 +521,20 @@
 <script>
   // ── CONFIG ──
   const players = [
-    { name: 'REG', age: 24, retireAge: 62 },
-    { name: 'BCD', age: 23, retireAge: 62 },
+    { name: 'REG', birthday: new Date(2001, 11, 21), retireAge: 62 }, // Dec 21, 2001
+    { name: 'BCD', birthday: new Date(2002, 6, 29), retireAge: 62 },  // Jul 29, 2002
   ];
+
+  // Calculate current age from birthday
+  function getAge(birthday) {
+    const now = new Date();
+    let age = now.getFullYear() - birthday.getFullYear();
+    const monthDiff = now.getMonth() - birthday.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birthday.getDate())) {
+      age--;
+    }
+    return age;
+  }
 
   let currentView = 0; // 0 = P1, 1 = P2, 2 = both (average)
 
@@ -552,15 +563,19 @@
 
   // ── CALC ──
   function getRetireDate(player) {
-    const now = new Date();
-    const birthYear = now.getFullYear() - player.age;
-    return new Date(birthYear + player.retireAge, now.getMonth(), now.getDate());
+    // Retire on their birthday the year they turn retireAge
+    return new Date(
+      player.birthday.getFullYear() + player.retireAge,
+      player.birthday.getMonth(),
+      player.birthday.getDate()
+    );
   }
 
   function getTimeLeft(player) {
     const now = new Date();
     const retire = getRetireDate(player);
     const diff = retire - now;
+    const currentAge = getAge(player.birthday);
     if (diff <= 0) return null;
 
     const totalDays = diff / (1000 * 60 * 60 * 24);
@@ -590,6 +605,11 @@
     // Work days (Mon-Fri)
     const workDays = Math.floor(totalDays) - weekends;
 
+    // Next birthday countdown
+    const nextBday = new Date(now.getFullYear(), player.birthday.getMonth(), player.birthday.getDate());
+    if (nextBday <= now) nextBday.setFullYear(nextBday.getFullYear() + 1);
+    const daysToNextBday = Math.ceil((nextBday - now) / (1000 * 60 * 60 * 24));
+
     return {
       totalDays: Math.floor(totalDays),
       years,
@@ -602,7 +622,9 @@
       weekends,
       workDays,
       retireAge: player.retireAge,
-      currentAge: player.age,
+      currentAge,
+      daysToNextBday,
+      nextLevel: currentAge + 1,
     };
   }
 
@@ -631,6 +653,7 @@
       { icon: '&#x1F3AE;', name: 'AFTER-WORK GAME SESSIONS', value: data.workDays.toLocaleString() },
       { icon: '&#x1F4B8;', name: 'PAYCHECKS LEFT', value: (data.months * 2).toLocaleString() },
       { icon: '&#x1F4C8;', name: 'MEETINGS TO SURVIVE', value: (data.workDays * 2).toLocaleString() },
+      { icon: '&#x1F382;', name: 'NEXT LEVEL-UP IN', value: data.daysToNextBday + ' DAYS' },
       { icon: '&#x231B;', name: 'TOTAL SECONDS', value: data.totalSeconds.toLocaleString() },
     ];
   }
@@ -714,11 +737,11 @@
     // Achievement
     document.getElementById('achievementText').textContent = getAchievement(data);
 
-    // Character info
+    // Character info (dynamic age from birthday)
     document.getElementById('charName1').textContent = players[0].name;
-    document.getElementById('charAge1').textContent = `LVL ${players[0].age}`;
+    document.getElementById('charAge1').textContent = `LVL ${getAge(players[0].birthday)}`;
     document.getElementById('charName2').textContent = players[1].name;
-    document.getElementById('charAge2').textContent = `LVL ${players[1].age}`;
+    document.getElementById('charAge2').textContent = `LVL ${getAge(players[1].birthday)}`;
   }
 
   // ── QUOTE ROTATION ──
